@@ -1,0 +1,39 @@
+name: Feature request
+description: Propose a focused improvement while preserving the small core.
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / use case
+      description: What concrete workflow is currently awkward or impossible?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest useful API and a short usage example.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: abi
+    attributes:
+      label: ABI impact
+      options:
+        - No public ABI change
+        - Additive ABI change
+        - Potential ABI-major change
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Resource / portability constraints
+      description: Dependencies, binary size, platform support and testing requirements.

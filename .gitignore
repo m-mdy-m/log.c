@@ -1,0 +1,10 @@
+/build/
+/build-cmake/
+/build-static/
+/build-shared/
+/stage/
+/stage-e2e/
+/dist/
+*.log
+*.tmp
+__pycache__/

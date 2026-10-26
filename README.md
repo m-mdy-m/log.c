@@ -1,83 +1,68 @@
-# log.c
-A simple logging library implemented in C99
+# m-mdy-m/log.c
 
-![screenshot](https://cloud.githubusercontent.com/assets/3920290/23831970/a2415e96-0723-11e7-9886-f8f5d2de60fe.png)
+`m-mdy-m/log.c` is a small C11 logging library. It writes `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, and `FATAL` messages to the console, a file, or an application callback. The core has no third-party runtime dependency and provides a stable C ABI for language bindings.
 
+## Build
 
-## Usage
-**[log.c](src/log.c?raw=1)** and **[log.h](src/log.h?raw=1)** should be dropped
-into an existing project and compiled along with it. The library provides 6
-function-like macros for logging:
+```sh
+git clone https://github.com/m-mdy-m/log.c.git
+cd log.c
+make
+make check
+```
+
+To install locally on a Unix-like system:
+
+```sh
+make install PREFIX="$HOME/.local"
+```
+
+See [Installation and build](docs/installation.md) for CMake, Windows, release packages, and linking options.
+
+## Use
 
 ```c
-log_trace(const char *fmt, ...);
-log_debug(const char *fmt, ...);
-log_info(const char *fmt, ...);
-log_warn(const char *fmt, ...);
-log_error(const char *fmt, ...);
-log_fatal(const char *fmt, ...);
+#include <m-mdy-m/log.h>
+
+int main(void) {
+    mmlog_logger_config_t config;
+    mmlog_logger_t *logger = NULL;
+
+    if (mmlog_logger_config_init(&config) != MMLLOG_OK) return 1;
+    if (mmlog_logger_create(&config, &logger) != MMLLOG_OK) return 1;
+
+    MMLLOG_INFO(logger, "service started");
+
+    mmlog_logger_destroy(logger);
+    return 0;
+}
 ```
 
-Each function takes a printf format string followed by additional arguments:
+Compile this example directly from the source tree:
 
-```c
-log_trace("Hello %s", "world")
+```sh
+cc -std=c11 -Wall -Wextra -Wpedantic -Iinclude app.c src/log.c -o app
+./app
 ```
 
-Resulting in a line with the given format printed to stderr:
+For more examples, see [`examples/c/basic.c`](examples/c/basic.c).
 
-```
-20:18:26 TRACE src/main.c:11: Hello world
-```
+## Documentation
 
+- [Documentation index](docs/index.md)
+- [User guide](docs/user-guide.md)
+- [Installation and build](docs/installation.md)
+- [C ABI reference](docs/abi.md)
+- [Language bindings](docs/language-bindings.md)
+- [Architecture](docs/architecture.md)
+- [Developer guide](docs/development.md)
+- [Release guide](docs/release.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
-#### log_set_quiet(bool enable)
-Quiet-mode can be enabled by passing `true` to the `log_set_quiet()` function.
-While this mode is enabled the library will not output anything to `stderr`, but
-will continue to write to files and callbacks if any are set.
+## Project policies
 
-
-#### log_set_level(int level)
-The current logging level can be set by using the `log_set_level()` function.
-All logs below the given level will not be written to `stderr`. By default the
-level is `LOG_TRACE`, such that nothing is ignored.
-
-
-#### log_add_fp(FILE *fp, int level)
-One or more file pointers where the log will be written can be provided to the
-library by using the `log_add_fp()` function. The data written to the file
-output is of the following format:
-
-```
-2047-03-11 20:18:26 TRACE src/main.c:11: Hello world
-```
-
-Any messages below the given `level` are ignored. If the library failed to add a
-file pointer a value less-than-zero is returned.
-
-
-#### log_add_callback(log_LogFn fn, void *udata, int level)
-One or more callback functions which are called with the log data can be
-provided to the library by using the `log_add_callback()` function. A callback
-function is passed a `log_Event` structure containing the `line` number,
-`filename`, `fmt` string, `va` printf va\_list, `level` and the given `udata`.
-
-
-#### log_set_lock(log_LockFn fn, void *udata)
-If the log will be written to from multiple threads a lock function can be set.
-The function is passed the boolean `true` if the lock should be acquired or
-`false` if the lock should be released and the given `udata` value.
-
-
-#### const char* log_level_string(int level)
-Returns the name of the given log level as a string.
-
-
-#### LOG_USE_COLOR
-If the library is compiled with `-DLOG_USE_COLOR` ANSI color escape codes will
-be used when printing.
-
+[Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md)
 
 ## License
-This library is free software; you can redistribute it and/or modify it under
-the terms of the MIT license. See [LICENSE](LICENSE) for details.
+
+MIT. See [LICENSE](LICENSE) and [NOTICE](NOTICE) for license and upstream attribution.

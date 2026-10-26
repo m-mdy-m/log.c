@@ -1,0 +1,15 @@
+m-mdy-m-log — third-party attribution and project lineage
+
+This repository is a redesigned and extended logging library for the m-mdy-m/log.c repository.
+The predecessor repository https://github.com/m-mdy-m/log.c is publicly identified as a fork
+of https://github.com/rxi/log.c. The minimal logging-library design and project lineage are
+attributed to that upstream work.
+
+Copyright (c) 2020 rxi
+Original upstream project: https://github.com/rxi/log.c
+License: MIT (see LICENSE)
+
+The current m-mdy-m-log ABI, record model, CLI field formatter, control-character escaping,
+bindings, tests, documentation, build system and release automation are substantial redesign
+work. This notice does not claim that all current files are verbatim copies of upstream files.
+Retain this NOTICE and the MIT LICENSE when redistributing this source package.

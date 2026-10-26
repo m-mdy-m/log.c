@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  posix:
+    name: ${{ matrix.id }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux-x86_64-gcc
+            os: ubuntu-24.04
+            cc: gcc
+          - id: linux-x86_64-clang
+            os: ubuntu-24.04
+            cc: clang
+          - id: linux-arm64-gcc
+            os: ubuntu-24.04-arm
+            cc: gcc
+          - id: macos-arm64-clang
+            os: macos-15
+            cc: clang
+          - id: macos-x86_64-clang
+            os: macos-15-intel
+            cc: clang
+    env:
+      CC: ${{ matrix.cc }}
+      CMAKE_GENERATOR: Ninja
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Linux build tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang cmake ninja-build pkg-config python3
+      - name: Install macOS build tools
+        if: runner.os == 'macOS'
+        run: brew install cmake ninja pkg-config
+      - name: Build static and shared versions; run unit, concurrency, install and E2E tests
+        run: bash tools/build_test_install.sh "$PWD/stage"
+      - name: Validate public ABI exports
+        run: python3 tools/check_abi.py
+      - name: Validate documentation links
+        run: python3 tools/check_docs.py
+      - name: Check installed pkg-config metadata
+        if: runner.os != 'Windows'
+        run: PKG_CONFIG_PATH="$PWD/stage/lib/pkgconfig" pkg-config --cflags --libs m-mdy-m-log
+
+  windows-ucrt64:
+    name: Windows x86-64 / MinGW-w64 UCRT64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install MinGW-w64 UCRT64 toolchain
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-binutils
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-pkgconf
+            make
+      - name: Build static/shared, test install and run independent consumer
+        shell: msys2 {0}
+        env:
+          CC: gcc
+          CMAKE_GENERATOR: Ninja
+        run: bash tools/build_test_install.sh "$PWD/stage"
+      - name: Validate docs and ABI symbols
+        shell: msys2 {0}
+        run: |
+          python3 tools/check_docs.py
+          python3 tools/check_abi.py
+      - name: Create a release ZIP for the PowerShell installer test
+        shell: msys2 {0}
+        run: |
+          python3 tools/package_binary.py --prefix "$PWD/stage" --version ci \
+            --platform windows-x86_64-ucrt64 --format zip --outdir dist
+      - name: Test the actual ZIP and PowerShell installer
+        shell: pwsh
+        run: |
+          $archive = (Get-ChildItem -LiteralPath .\dist -Filter '*.zip' | Select-Object -First 1).FullName
+          if (-not $archive) { throw 'No Windows SDK ZIP was produced.' }
+          & .\tests\e2e_windows_install.ps1 -Archive $archive -Prefix "$PWD\stage-powershell-install"
+      - name: Compile and run consumer from PowerShell-installed files
+        shell: msys2 {0}
+        run: bash tests/e2e_install.sh "$PWD/stage-powershell-install" gcc
+
+  lua-5-4:
+    name: Optional Lua 5.4 binding
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Lua 5.4 development files
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential lua5.4 liblua5.4-dev pkg-config
+      - name: Build/test C core and Lua adapter
+        run: |
+          make clean check
+          make lua
+          LUA_CPATH='build/lua/?.so;;' LD_LIBRARY_PATH='build/lib' lua5.4 examples/lua/basic.lua
+
+  freebsd:
+    name: FreeBSD 15 / native BSD smoke test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build and test inside FreeBSD VM
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "15"
+          usesh: true
+          prepare: pkg install -y bash cmake ninja python3 pkgconf
+          run: |
+            export CC=cc
+            export CMAKE_GENERATOR=Ninja
+            /usr/local/bin/bash tools/build_test_install.sh "$PWD/stage"
+
+  openbsd:
+    name: OpenBSD 7.9 / native Unix-like smoke test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build and test inside OpenBSD VM
+        uses: vmactions/openbsd-vm@v1
+        with:
+          release: "7.9"
+          usesh: true
+          prepare: pkg_add bash cmake ninja python3 pkgconf
+          run: |
+            export CC=cc
+            export CMAKE_GENERATOR=Ninja
+            /usr/local/bin/bash tools/build_test_install.sh "$PWD/stage"

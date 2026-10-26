@@ -1,0 +1,10 @@
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${pcfiledir}/..
+includedir=${prefix}/include
+
+Name: m-mdy-m/log.c
+Description: Small extensible C logging library with a stable non-variadic ABI
+Version: @VERSION@
+Libs: -L${libdir} -lm-mdy-m-log
+Cflags: -I${includedir}

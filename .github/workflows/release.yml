@@ -1,0 +1,329 @@
+name: Build, test, package and publish release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-posix:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            os: ubuntu-24.04
+            cc: gcc
+            format: tar.gz
+          - platform: linux-aarch64
+            os: ubuntu-24.04-arm
+            cc: gcc
+            format: tar.gz
+          - platform: macos-x86_64
+            os: macos-15-intel
+            cc: clang
+            format: tar.gz
+          - platform: macos-arm64
+            os: macos-15
+            cc: clang
+            format: tar.gz
+    env:
+      CC: ${{ matrix.cc }}
+      CMAKE_GENERATOR: Ninja
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Linux build tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config python3
+      - name: Install macOS build tools
+        if: runner.os == 'macOS'
+        run: brew install cmake ninja pkg-config
+      - name: Validate tag and determine package version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^project(m_mdy_m_log VERSION \([^ ]*\).*/\1/p' CMakeLists.txt)"
+          test -n "$version"
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            tag_version="${GITHUB_REF_NAME#v}"
+            [[ "$GITHUB_REF_NAME" == "v$version" ]] || { echo "Tag $GITHUB_REF_NAME does not match project version $version" >&2; exit 1; }
+            grep -Fq "## [$tag_version]" CHANGELOG.md || { echo "CHANGELOG.md missing section for $tag_version" >&2; exit 1; }
+            version="$tag_version"
+          else
+            version="${version}-dev.${GITHUB_SHA:0:7}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Build static/shared, test and validate installed SDK end-to-end
+        run: bash tools/build_test_install.sh "$PWD/stage"
+      - name: Package platform SDK
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+          PLATFORM: ${{ matrix.platform }}
+          PACKAGE_FORMAT: ${{ matrix.format }}
+        run: |
+          python3 tools/package_binary.py --prefix "$PWD/stage" --version "$PACKAGE_VERSION" \
+            --platform "$PLATFORM" --format "$PACKAGE_FORMAT" --outdir dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: platform-assets-${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  build-windows:
+    name: windows-x86_64-ucrt64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install MinGW-w64 UCRT64 toolchain
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-binutils
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-pkgconf
+            zip
+            make
+      - name: Validate tag and determine package version
+        id: version
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^project(m_mdy_m_log VERSION \([^ ]*\).*/\1/p' CMakeLists.txt)"
+          test -n "$version"
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            tag_version="${GITHUB_REF_NAME#v}"
+            [[ "$GITHUB_REF_NAME" == "v$version" ]] || { echo "Tag $GITHUB_REF_NAME does not match project version $version" >&2; exit 1; }
+            grep -Fq "## [$tag_version]" CHANGELOG.md || { echo "CHANGELOG.md missing section for $tag_version" >&2; exit 1; }
+            version="$tag_version"
+          else
+            version="${version}-dev.${GITHUB_SHA:0:7}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Build static/shared, test and validate installed SDK end-to-end
+        shell: msys2 {0}
+        env:
+          CC: gcc
+          CMAKE_GENERATOR: Ninja
+        run: bash tools/build_test_install.sh "$PWD/stage"
+      - name: Package Windows SDK
+        shell: msys2 {0}
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python3 tools/package_binary.py --prefix "$PWD/stage" --version "$PACKAGE_VERSION" \
+            --platform windows-x86_64-ucrt64 --format zip --outdir dist
+      - name: Verify the released Windows ZIP with PowerShell installer
+        shell: pwsh
+        run: |
+          $archive = (Get-ChildItem -LiteralPath .\dist -Filter '*.zip' | Select-Object -First 1).FullName
+          if (-not $archive) { throw 'No Windows SDK ZIP was produced.' }
+          & .\tests\e2e_windows_install.ps1 -Archive $archive -Prefix "$PWD\stage-powershell-install"
+      - name: Re-test installed Windows SDK as a native consumer
+        shell: msys2 {0}
+        run: bash tests/e2e_install.sh "$PWD/stage-powershell-install" gcc
+      - uses: actions/upload-artifact@v7
+        with:
+          name: platform-assets-windows-x86_64-ucrt64
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  build-freebsd:
+    name: freebsd-x86_64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build, test and package on native FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "15"
+          usesh: true
+          prepare: pkg install -y bash cmake ninja python3 pkgconf
+          run: |
+            export CC=cc
+            export CMAKE_GENERATOR=Ninja
+            /usr/local/bin/bash tools/build_test_install.sh "$PWD/stage"
+            version="$(sed -n 's/^project(m_mdy_m_log VERSION \([^ ]*\).*/\1/p' CMakeLists.txt)"
+            python3 tools/package_binary.py --prefix "$PWD/stage" --version "$version" \
+              --platform freebsd-x86_64 --format tar.gz --outdir dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: platform-assets-freebsd-x86_64
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  build-openbsd:
+    name: openbsd-x86_64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build, test and package on native OpenBSD
+        uses: vmactions/openbsd-vm@v1
+        with:
+          release: "7.9"
+          usesh: true
+          prepare: pkg_add bash cmake ninja python3 pkgconf
+          run: |
+            export CC=cc
+            export CMAKE_GENERATOR=Ninja
+            /usr/local/bin/bash tools/build_test_install.sh "$PWD/stage"
+            version="$(sed -n 's/^project(m_mdy_m_log VERSION \([^ ]*\).*/\1/p' CMakeLists.txt)"
+            python3 tools/package_binary.py --prefix "$PWD/stage" --version "$version" \
+              --platform openbsd-x86_64 --format tar.gz --outdir dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: platform-assets-openbsd-x86_64
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-release:
+    name: Publish GitHub Release assets
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [build-posix, build-windows, build-freebsd, build-openbsd]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: platform-assets-*
+          path: release-assets
+          merge-multiple: true
+      - name: Create source archives, release notes and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          python3 tools/package_source.py --version "$version" --outdir release-assets
+          archives="$(find release-assets -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) | wc -l)"
+          test "$archives" -eq 9 || { echo "Expected 7 platform archives plus 2 source archives; found $archives" >&2; exit 1; }
+          cd release-assets
+          for asset in ./*.tar.gz ./*.zip; do
+            [[ -f "$asset" ]] || continue
+            sha256sum "$asset" > "$asset.sha256"
+          done
+          sha256sum ./*.tar.gz ./*.zip > SHA256SUMS.txt
+          version="${GITHUB_REF_NAME#v}"
+          awk -v target="## [${version}]" '
+            /^## \[/ { if (found) exit; if (index($0, target) == 1) found = 1 }
+            found { print }
+          ' ../CHANGELOG.md > ../release-notes.md
+          test -s ../release-notes.md || { echo "No changelog section found for $version" >&2; exit 1; }
+          cat >> ../release-notes.md <<'NOTES'
+
+          ---
+
+          ## Assets
+
+          - Source archives: ZIP and TAR.GZ.
+          - Linux: x86-64 and ARM64 SDK archives.
+          - macOS: x86-64 and ARM64 SDK archives.
+          - Windows: x86-64 MinGW-w64 UCRT64 SDK ZIP.
+          - FreeBSD: x86-64 native SDK TAR.GZ.
+          - OpenBSD: x86-64 native SDK TAR.GZ.
+          - SHA-256 sidecars and `SHA256SUMS.txt` accompany the assets.
+
+          Each SDK archive contains `include/m-mdy-m/log.h`, static/shared libraries for its target, installation helper, examples, documentation, and build metadata. Windows packages target MinGW-w64 UCRT64, not MSVC.
+
+          The Docker SDK image is published separately to Docker Hub when the required repository secrets are configured.
+          NOTES
+      - name: Verify final release inventory
+        run: |
+          set -euo pipefail
+          test "$(find release-assets -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) | wc -l)" -eq 9
+          test -f release-assets/SHA256SUMS.txt
+          find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
+      - name: Publish release
+        uses: softprops/action-gh-release@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: m-mdy-m/log.c ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: release-assets/*
+          fail_on_unmatched_files: true
+          prerelease: ${{ contains(github.ref_name, '-alpha.') || contains(github.ref_name, '-beta.') || contains(github.ref_name, '-rc.') }}
+          make_latest: ${{ !contains(github.ref_name, '-') }}
+
+  publish-dockerhub:
+    name: Publish multi-architecture Docker Hub SDK image
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: publish-release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check Docker Hub credentials are configured
+        id: credentials
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_TOKEN" ]]; then
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo 'Docker Hub publishing skipped: configure repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: docker/setup-qemu-action@v4
+        if: steps.credentials.outputs.configured == 'true'
+      - uses: docker/setup-buildx-action@v4
+        if: steps.credentials.outputs.configured == 'true'
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        if: steps.credentials.outputs.configured == 'true'
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Generate Docker image metadata
+        id: metadata
+        uses: docker/metadata-action@v6
+        if: steps.credentials.outputs.configured == 'true'
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/log.c
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+          labels: |
+            org.opencontainers.image.title=m-mdy-m/log.c SDK
+            org.opencontainers.image.description=Multi-architecture development image for the m-mdy-m/log.c C logging library
+      - name: Build and push linux/amd64 and linux/arm64 images
+        uses: docker/build-push-action@v7
+        if: steps.credentials.outputs.configured == 'true'
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

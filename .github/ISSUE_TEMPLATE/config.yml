@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/m-mdy-m/log.c/tree/master/docs
+    about: Read the specification, ABI contract, architecture and build guide.
