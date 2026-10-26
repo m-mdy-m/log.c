@@ -51,6 +51,7 @@ cmake -S "$ROOT/tests/e2e-cmake" -B "$ROOT/build/e2e-package-cmake" \
   -DCMAKE_PREFIX_PATH="$PACKAGE_ROOT/installed"
 cmake --build "$ROOT/build/e2e-package-cmake" --config Release --parallel
 ctest --test-dir "$ROOT/build/e2e-package-cmake" -C Release --output-on-failure
+python3 "$ROOT/tests/test_check_abi_parser.py"
 python3 "$ROOT/tools/check_abi.py"
 python3 "$ROOT/tools/check_docs.py"
 if [[ "$(uname -s 2>/dev/null || printf unknown)" != MINGW* && "$(uname -s 2>/dev/null || printf unknown)" != MSYS* ]] && command -v pkg-config >/dev/null 2>&1; then

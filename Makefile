@@ -76,6 +76,7 @@ docs-check:
 	python3 tools/check_docs.py
 
 abi-check: shared
+	python3 tests/test_check_abi_parser.py
 	python3 tools/check_abi.py
 
 # End-to-end: install to an isolated staging prefix and compile/run a new external consumer.

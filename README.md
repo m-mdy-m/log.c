@@ -2,6 +2,12 @@
 
 `m-mdy-m/log.c` is a small C11 logging library. It writes `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, and `FATAL` messages to the console, a file, or an application callback. The core has no third-party runtime dependency and provides a stable C ABI for language bindings.
 
+## What it is
+
+`m-mdy-m/log.c` started from the original [`rxi/log.c`](https://github.com/rxi/log.c), keeping its simple goal: a small logger that is easy to add to a C program. It has since been redesigned around explicit logger instances, structured records, configurable output sinks, and a versioned C ABI.
+
+The library does not know anything about your application or its business logic. Your code decides what to log, when to log, and which metadata to attach. The logger formats each record and sends it to the console, an append-only file, or a callback. Other languages can use the non-variadic `mmlog_logger_write()` ABI entry point.
+
 ## Build
 
 ```sh
@@ -66,3 +72,9 @@ For more examples, see [`examples/c/basic.c`](examples/c/basic.c).
 ## License
 
 MIT. See [LICENSE](LICENSE) and [NOTICE](NOTICE) for license and upstream attribution.
+
+## Credits
+
+- Based on the original [`rxi/log.c`](https://github.com/rxi/log.c) by rxi (MIT).
+- The redesigned API, structured records, ABI, bindings, tests, build system, and documentation are maintained in this repository.
+- See [NOTICE](NOTICE) for project lineage and attribution.

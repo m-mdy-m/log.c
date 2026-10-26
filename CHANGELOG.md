@@ -31,6 +31,8 @@ library, based on the previous `rxi/log.c` project.
   uninstallation targets, CMake package metadata, and `pkg-config` metadata.
 - C unit tests, concurrent-write tests, ABI export checks, documentation checks,
   and end-to-end tests for installed static/shared consumers.
+- Format-aware ABI export inspection for ELF, Mach-O, and PE/Windows DLLs,
+  with parser regression tests for GNU `nm`, GNU `objdump`, and `dumpbin` output.
 - A Lua 5.4 adapter example and FFI guidance for Python, Rust, Go, C#, Zig, and
   other runtimes that can call a C ABI.
 - GitHub Actions workflows for supported platform builds, release asset creation,
