@@ -1,0 +1,86 @@
+name: Reusable dependency graph submission
+
+on:
+  workflow_call:
+    inputs:
+      dependency-version:
+        description: Published m-mdy-m/log.c version used by the caller
+        required: true
+        type: string
+      manifest-path:
+        description: Repository-relative lock or manifest file that pins the logger
+        required: false
+        default: deps.lock
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  submit:
+    name: Submit m-mdy-m/log.c dependency
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Submit dependency snapshot
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_VERSION: ${{ inputs.dependency-version }}
+          MANIFEST_PATH: ${{ inputs.manifest-path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$PACKAGE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "dependency-version must be a valid semantic version (without the v prefix)." >&2
+            exit 1
+          fi
+
+          snapshot="$(mktemp)"
+          trap 'rm -f "$snapshot"' EXIT
+
+          jq -n \
+            --arg sha "$GITHUB_SHA" \
+            --arg ref "$GITHUB_REF" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg workflow "$GITHUB_WORKFLOW" \
+            --arg job "$GITHUB_JOB" \
+            --arg version "$PACKAGE_VERSION" \
+            --arg manifest "$MANIFEST_PATH" \
+            --arg scanned "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{
+              version: 0,
+              sha: $sha,
+              ref: $ref,
+              job: {
+                id: $run_id,
+                correlator: ($workflow + "-" + $job)
+              },
+              detector: {
+                name: "m-mdy-m-log.c dependency declaration",
+                version: "1.0.0",
+                url: "https://github.com/m-mdy-m/log.c"
+              },
+              scanned: $scanned,
+              manifests: {
+                "m-mdy-m/log.c": {
+                  name: "m-mdy-m/log.c",
+                  file: { source_location: $manifest },
+                  resolved: {
+                    "m-mdy-m/log.c": {
+                      package_url: ("pkg:github/m-mdy-m/log.c@" + $version),
+                      relationship: "direct",
+                      scope: "runtime",
+                      dependencies: []
+                    }
+                  }
+                }
+              }
+            }' > "$snapshot"
+
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/dependency-graph/snapshots" \
+            --data-binary "@$snapshot"
