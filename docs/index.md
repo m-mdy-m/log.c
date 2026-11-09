@@ -17,6 +17,7 @@ The public header is [`include/m-mdy-m/log.h`](../include/m-mdy-m/log.h). It def
 | Understand how a log record moves through the library | [Architecture](architecture.md) |
 | Change the code or add tests | [Developer guide](development.md) |
 | Package a release, verify it, or publish GitHub/Docker assets | [Release guide](release.md) |
+| Pull a native SDK archive from GitHub Container Registry | [OCI packages](oci-packages.md) |
 | Fix a common build, link, or output problem | [Troubleshooting](troubleshooting.md) |
 
 New users should read this page, follow the first example in the [user guide](user-guide.md), then use the [installation guide](installation.md) for their platform. Anyone writing an FFI binding should read the [ABI reference](abi.md) before writing bindings code.
