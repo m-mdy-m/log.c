@@ -59,6 +59,13 @@ def validate_version(value: str) -> str:
     )
     if not re.fullmatch(pattern, value):
         raise PublishError(f"invalid package version: {value!r}")
+
+    prerelease = value.split("+", 1)[0].partition("-")[2]
+    for identifier in prerelease.split(".") if prerelease else ():
+        if identifier.isdigit() and len(identifier) > 1 and identifier.startswith("0"):
+            raise PublishError(
+                "numeric SemVer prerelease identifiers must not contain leading zeroes"
+            )
     return value
 
 
