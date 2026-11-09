@@ -311,7 +311,7 @@ jobs:
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
-          project_version="$(sed -n 's/^project(m_mdy_m_log VERSION \\([^ ]*\\).*/\\1/p' CMakeLists.txt)"
+          project_version="$(sed -n 's/^project(m_mdy_m_log VERSION \([^ ]*\).*/\1/p' CMakeLists.txt)"
           [[ "$GITHUB_REF_NAME" == "v$project_version" && "$version" == "$project_version" ]] || {
             echo "Release tag does not match CMake project version." >&2
             exit 1
@@ -327,11 +327,11 @@ jobs:
         run: |
           set -euo pipefail
           version="${PACKAGE_VERSION#v}"
-          python3 tools/publish_oci.py \\
-            --assets-directory release-assets \\
-            --version "$version" \\
-            --source-revision "$SOURCE_REVISION" \\
-            --owner "$REGISTRY_OWNER" \\
+          python3 tools/publish_oci.py \
+            --assets-directory release-assets \
+            --version "$version" \
+            --source-revision "$SOURCE_REVISION" \
+            --owner "$REGISTRY_OWNER" \
             --output-directory oci-evidence
           cat oci-evidence/OCI-PUBLICATIONS.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload per-platform publication and pull-back evidence
