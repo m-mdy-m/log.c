@@ -65,6 +65,10 @@ For more examples, see [`examples/c/basic.c`](examples/c/basic.c).
 - [Release guide](docs/release.md)
 - [Troubleshooting](docs/troubleshooting.md)
 
+## Dependency graph
+
+GitHub consumers can submit their pinned `m-mdy-m/log.c` dependency to their own Dependency Graph using the [reusable dependency-submission workflow](docs/dependency-graph.md). This is the supported route for C consumers; GitHub does not statically parse CMake or Makefile dependency declarations.
+
 ## Project policies
 
 [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md)
