@@ -97,13 +97,28 @@ class OciTargetInventoryTests(unittest.TestCase):
             with self.assertRaisesRegex(PublishError, "missing or unsafe openbsd-x86_64"):
                 resolve_archives(root, "0.1.1")
 
-    def test_version_validator_accepts_release_and_prerelease_versions(self) -> None:
-        self.assertEqual(validate_version("0.1.1"), "0.1.1")
-        self.assertEqual(validate_version("0.2.0-rc.1"), "0.2.0-rc.1")
-        self.assertEqual(validate_version("0.2.0-rc.1+build.7"), "0.2.0-rc.1+build.7")
+    def test_version_validator_accepts_release_prerelease_and_build_metadata(self) -> None:
+        for value in (
+            "0.1.1",
+            "0.2.0-rc",
+            "0.2.0-rc.1",
+            "0.2.0-rc.1+build.7",
+            "0.1.1+build.7",
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(validate_version(value), value)
 
     def test_version_validator_rejects_tag_prefix_and_malformed_versions(self) -> None:
-        for value in ("v0.1.1", "latest", "0.1", "0.1.1-rc", "01.1.1"):
+        for value in (
+            "v0.1.1",
+            "latest",
+            "0.1",
+            "0.1.1-",
+            "0.1.1-rc.",
+            "0.1.1-01",
+            "0.1.1-rc.01",
+            "01.1.1",
+        ):
             with self.subTest(value=value):
                 with self.assertRaises(PublishError):
                     validate_version(value)
