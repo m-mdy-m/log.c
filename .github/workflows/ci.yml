@@ -114,7 +114,8 @@ jobs:
           sudo apt-get install -y build-essential lua5.4 liblua5.4-dev pkg-config
       - name: Build/test C core and Lua adapter
         run: |
-          make clean check
+          make clean
+          make check
           make lua
           LUA_CPATH='build/lua/?.so;;' LD_LIBRARY_PATH='build/lib' lua5.4 examples/lua/basic.lua
 
