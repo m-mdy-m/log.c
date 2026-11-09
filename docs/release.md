@@ -1,6 +1,6 @@
 # Release guide
 
-This document describes how to verify and publish a release of `m-mdy-m/log.c`. Building a package locally does not publish it. The GitHub Release workflow starts only after a version tag is pushed, and Docker Hub publication additionally requires credentials.
+This document describes how to verify and publish a release of `m-mdy-m/log.c`. Building a package locally does not publish it. Pushing a version tag starts GitHub Release asset publication and the independent GHCR SDK-package publication. Docker Hub publication remains a separate optional channel that requires credentials.
 
 ## 1. Before a release
 
@@ -36,7 +36,7 @@ git tag -v v0.1.0
 # git push origin v0.1.0
 ```
 
-The final push is intentionally commented out in this example. The workflow performs builds and tests for the configured platform matrix, creates source archives and checksums, then attaches the SDK archives to a GitHub Release. If any required platform build fails, release publication should be blocked.
+The final push is intentionally commented out in this example. The workflow builds and tests the configured platform matrix, creates source archives and checksums, and attaches the SDK archives to a GitHub Release. A second job publishes those same seven SDK archives to GHCR as OCI packages. Both publication jobs depend on every native build job but are independent of each other: a failure in one registry channel does not suppress the other. If any required platform build fails, both channels are blocked.
 
 Current release assets are configured for:
 
@@ -52,7 +52,31 @@ Current release assets are configured for:
 
 A prebuilt library must match the consumer's operating system, CPU architecture, and C runtime. The Windows asset is for MinGW-w64 UCRT64, not MSVC.
 
-## 3. Docker Hub SDK image
+## 3. GitHub Container Registry packages
+
+The seven platform SDK archives from the release are also published to the GHCR package `ghcr.io/m-mdy-m/m-mdy-m-log`:
+
+| Target | OCI tag suffix | Media type |
+|---|---|---|
+| Linux x86-64 | `linux-x86_64` | TAR.GZ |
+| Linux ARM64 | `linux-aarch64` | TAR.GZ |
+| macOS Intel | `macos-x86_64` | TAR.GZ |
+| macOS Apple silicon | `macos-arm64` | TAR.GZ |
+| Windows x86-64 UCRT64 | `windows-x86_64-ucrt64` | ZIP |
+| FreeBSD x86-64 | `freebsd-x86_64` | TAR.GZ |
+| OpenBSD x86-64 | `openbsd-x86_64` | TAR.GZ |
+
+For example, pull the Linux x86-64 package for version `0.1.1`:
+
+```sh
+oras pull ghcr.io/m-mdy-m/m-mdy-m-log:0.1.1-linux-x86_64
+```
+
+These are OCI package artifacts containing SDK archives, not runnable container images. Do not use `docker pull` for them. Each publication records a SHA-256 checksum, a publication receipt, and an immutable manifest digest; the workflow pulls the artifact back by that digest and verifies its bytes.
+
+A tag is a discovery alias. For reproducible consumption, retain the immutable `@sha256:...` reference shown in the per-platform publication evidence. On the first publication, check the package visibility under GitHub Packages and set it to Public if it should be downloadable without authentication.
+
+## 4. Docker Hub SDK image
 
 The Docker image is an SDK/build environment, not a long-running log service. It is intended to let an application build with the logger's public header and libraries.
 
@@ -72,7 +96,7 @@ docker run --rm -it -v "$PWD:/workspace" <dockerhub-username>/log.c:latest
 
 The example name is a placeholder. Use the actual namespace configured in the repository's workflow.
 
-## 4. Verify release downloads
+## 5. Verify release downloads
 
 After downloading an archive, check its digest against the matching line in `SHA256SUMS.txt`. On Linux:
 
@@ -88,7 +112,7 @@ Get-FileHash .\m-mdy-m-log-v0.1.0-windows-x86_64-ucrt64.zip -Algorithm SHA256
 
 Compare the resulting digest to the trusted checksum published for the same release. A checksum downloaded from the same untrusted source as a changed archive cannot independently prove the source is trustworthy.
 
-## 5. Local package checks
+## 6. Local package checks
 
 You can create source packages without publishing them:
 
