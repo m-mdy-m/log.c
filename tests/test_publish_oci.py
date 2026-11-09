@@ -53,6 +53,19 @@ class OciTargetInventoryTests(unittest.TestCase):
             self.assertEqual(len(result), 7)
             self.assertTrue(all(path.is_file() for path in result.values()))
 
+    def test_archive_selection_rejects_a_symlinked_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            actual = root / "actual"
+            actual.mkdir()
+            link = root / "linked"
+            try:
+                link.symlink_to(actual, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("directory symbolic links unavailable")
+            with self.assertRaisesRegex(PublishError, "directory is missing or unsafe"):
+                resolve_archives(link, "0.1.1")
+
     def test_archive_selection_rejects_a_missing_platform(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -87,6 +100,7 @@ class OciTargetInventoryTests(unittest.TestCase):
     def test_version_validator_accepts_release_and_prerelease_versions(self) -> None:
         self.assertEqual(validate_version("0.1.1"), "0.1.1")
         self.assertEqual(validate_version("0.2.0-rc.1"), "0.2.0-rc.1")
+        self.assertEqual(validate_version("0.2.0-rc.1+build.7"), "0.2.0-rc.1+build.7")
 
     def test_version_validator_rejects_tag_prefix_and_malformed_versions(self) -> None:
         for value in ("v0.1.1", "latest", "0.1", "0.1.1-rc", "01.1.1"):
