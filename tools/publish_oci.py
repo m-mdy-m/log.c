@@ -52,16 +52,21 @@ class PublishError(RuntimeError):
 
 
 def validate_version(value: str) -> str:
-    pattern = r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:alpha|beta|rc|dev)\.[0-9A-Za-z.-]+)?"
+    pattern = (
+        r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
+        r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+        r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+    )
     if not re.fullmatch(pattern, value):
         raise PublishError(f"invalid package version: {value!r}")
     return value
 
 
 def resolve_archives(directory: str | Path, version: str) -> dict[Target, Path]:
-    root = Path(directory).expanduser().resolve()
-    if not root.is_dir() or root.is_symlink():
+    root = Path(directory).expanduser()
+    if root.is_symlink() or not root.is_dir():
         raise PublishError(f"release asset directory is missing or unsafe: {root}")
+    root = root.absolute()
     result: dict[Target, Path] = {}
     for target in TARGETS:
         path = root / target.archive_name(version)
@@ -241,10 +246,11 @@ def main() -> int:
             raise PublishError("owner is not a valid lowercase GHCR namespace")
 
         artifacts = resolve_archives(args.assets_directory, version)
-        output_root = Path(args.output_directory).expanduser().resolve()
-        if output_root.exists() or output_root.is_symlink():
+        output_root = Path(args.output_directory).expanduser()
+        if output_root.is_symlink() or output_root.exists():
             raise PublishError(f"refusing to overwrite existing evidence directory: {output_root}")
-        output_root.mkdir(parents=True)
+        output_root = output_root.absolute()
+        output_root.mkdir(parents=True, exist_ok=False)
 
         records = [
             publish_target(
@@ -253,6 +259,7 @@ def main() -> int:
             )
             for target in TARGETS
         ]
+        shutil.rmtree(output_root / ".work")
         markdown = [
             f"# GHCR publication — m-mdy-m/log.c {version}", "",
             "| Target | OCI tag | Immutable digest | Media type |",
