@@ -267,6 +267,81 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-alpha.') || contains(github.ref_name, '-beta.') || contains(github.ref_name, '-rc.') }}
           make_latest: ${{ !contains(github.ref_name, '-') }}
 
+  publish-ghcr:
+    name: Publish native SDK packages to GitHub Container Registry
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [build-posix, build-windows, build-freebsd, build-openbsd]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    env:
+      PYTHONPATH: ${{ github.workspace }}/.pipeline/src
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out the shared Pipeline OCI verifier
+        uses: actions/checkout@v7
+        with:
+          repository: m-mdy-m/pipeline
+          ref: main
+          path: .pipeline
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Set up Python
+        uses: ./.pipeline/.github/actions/python-setup
+        with:
+          python-version: "3.12"
+      - name: Set up ORAS
+        uses: oras-project/setup-oras@v2.0.3
+        with:
+          version: "1.3.5"
+      - name: Download the exact SDK archives built for GitHub Release
+        uses: actions/download-artifact@v8
+        with:
+          pattern: platform-assets-*
+          path: release-assets
+          merge-multiple: true
+      - name: Validate release version and log in to GHCR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          project_version="$(sed -n 's/^project(m_mdy_m_log VERSION \\([^ ]*\\).*/\\1/p' CMakeLists.txt)"
+          [[ "$GITHUB_REF_NAME" == "v$project_version" && "$version" == "$project_version" ]] || {
+            echo "Release tag does not match CMake project version." >&2
+            exit 1
+          }
+          python3 -m pipeline.oci.cli validate-version --value "$version" >/dev/null
+          printf '%s' "$GH_TOKEN" | oras login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+      - name: Publish seven SDK packages and verify immutable pull-backs
+        env:
+          PACKAGE_VERSION: ${{ github.ref_name }}
+          SOURCE_REVISION: ${{ github.sha }}
+          REGISTRY_OWNER: ${{ github.repository_owner }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${PACKAGE_VERSION#v}"
+          python3 tools/publish_oci.py \\
+            --assets-directory release-assets \\
+            --version "$version" \\
+            --source-revision "$SOURCE_REVISION" \\
+            --owner "$REGISTRY_OWNER" \\
+            --output-directory oci-evidence
+          cat oci-evidence/OCI-PUBLICATIONS.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload per-platform publication and pull-back evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: ghcr-publication-evidence
+          path: oci-evidence/
+          if-no-files-found: error
+          retention-days: 90
+
   publish-dockerhub:
     name: Publish multi-architecture Docker Hub SDK image
     if: github.event_name == 'push' && github.ref_type == 'tag'
