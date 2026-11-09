@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(m_mdy_m_log VERSION 0.1.0 LANGUAGES C)
+project(m_mdy_m_log VERSION 0.1.1 LANGUAGES C)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)

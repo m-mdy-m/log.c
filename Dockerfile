@@ -17,7 +17,8 @@ RUN apt-get update \
 
 WORKDIR /opt/m-mdy-m-log
 COPY . .
-RUN make clean check \
+RUN make clean \
+    && make check \
     && make install PREFIX=/usr/local \
     && install -d /usr/share/doc/m-mdy-m-log \
     && cp README.md LICENSE NOTICE CHANGELOG.md /usr/share/doc/m-mdy-m-log/

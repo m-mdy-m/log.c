@@ -25,6 +25,10 @@ make install PREFIX="$HOME/.local"
 
 See [Installation and build](docs/installation.md) for CMake, Windows, release packages, and linking options.
 
+## Distribution
+
+Each version is published in two complementary places: [GitHub Releases](https://github.com/m-mdy-m/log.c/releases) contains downloadable SDK/source archives and checksums, while GitHub Container Registry (GHCR) contains the same seven native SDK archives as versioned OCI packages. These are package artifacts, not runnable Docker images; use ORAS to pull them. See [OCI packages](docs/oci-packages.md) for target tags, digests, and verification.
+
 ## Use
 
 ```c
