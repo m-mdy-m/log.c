@@ -166,7 +166,12 @@ def exported_symbols(library: Path) -> set[str]:
 def main() -> int:
     candidates = list(CANDIDATES)
     # Include common versioned suffixes produced by BSD/macOS and build dirs.
-    for directory in (ROOT / "build-shared", ROOT / "build", ROOT / "build-cmake-shared"):
+    for directory in (
+        ROOT / "build" / "lib",
+        ROOT / "build-shared",
+        ROOT / "build",
+        ROOT / "build-cmake-shared",
+    ):
         if directory.is_dir():
             candidates.extend(sorted(directory.glob("libm-mdy-m-log.so*")))
             candidates.extend(sorted(directory.glob("libm-mdy-m-log*.dylib")))
