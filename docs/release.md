@@ -25,15 +25,15 @@ These commands create a local commit only. They do not push a branch or tag.
 
 ## 2. Create a version tag and GitHub Release
 
-The release workflow expects a tag like `v0.1.0` to match the version declared by the project and a matching `CHANGELOG.md` section. **Do not create or push the tag until the commit you intend to release is signed, reviewed, and green in CI.**
+The release workflow expects a tag like `v0.1.1` to match the version declared by the project and a matching `CHANGELOG.md` section. **Do not create or push the tag until the commit you intend to release is signed, reviewed, and green in CI.**
 
 When you choose to publish:
 
 ```sh
-git tag -s v0.1.0 -m "m-mdy-m/log.c v0.1.0"
-git tag -v v0.1.0
+git tag -s v0.1.1 -m "m-mdy-m/log.c v0.1.1"
+git tag -v v0.1.1
 # Push only when you intentionally want GitHub Actions to publish the release:
-# git push origin v0.1.0
+# git push origin v0.1.1
 ```
 
 The final push is intentionally commented out in this example. The workflow builds and tests the configured platform matrix, creates source archives and checksums, and attaches the SDK archives to a GitHub Release. A second job publishes those same seven SDK archives to GHCR as OCI packages. Both publication jobs depend on every native build job but are independent of each other: a failure in one registry channel does not suppress the other. If any required platform build fails, both channels are blocked.
@@ -107,7 +107,7 @@ sha256sum -c SHA256SUMS.txt
 On macOS, calculate the file hash with `shasum -a 256`. On Windows, PowerShell can calculate it with:
 
 ```powershell
-Get-FileHash .\m-mdy-m-log-v0.1.0-windows-x86_64-ucrt64.zip -Algorithm SHA256
+Get-FileHash .\m-mdy-m-log-v0.1.1-windows-x86_64-ucrt64.zip -Algorithm SHA256
 ```
 
 Compare the resulting digest to the trusted checksum published for the same release. A checksum downloaded from the same untrusted source as a changed archive cannot independently prove the source is trustworthy.
