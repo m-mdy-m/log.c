@@ -37,11 +37,11 @@ On Linux x86-64:
 
 ```sh
 make package-linux
-# build/packages/m-mdy-m-log-v0.1.0-linux-x86_64.tar.gz
+# build/packages/m-mdy-m-log-v0.1.1-linux-x86_64.tar.gz
 ```
 
 It contains the installed header, static and shared library, relocatable pkg-config metadata, installation helper, docs, examples and build metadata. It is a native Linux x86-64 artifact, not cross-platform.
 
 ## GitHub Release
 
-The release matrix generates Linux x86-64/ARM64, macOS x86-64/ARM64, Windows x86-64 UCRT64, and FreeBSD/OpenBSD x86-64 SDK archives. The release job attaches these, source ZIP/TAR.GZ archives, and SHA-256 checksums. A separate Docker workflow verifies the SDK image build; the release flow publishes multi-architecture Docker Hub tags when the required repository secrets are configured.
+The release matrix generates Linux x86-64/ARM64, macOS x86-64/ARM64, Windows x86-64 UCRT64, and FreeBSD/OpenBSD x86-64 SDK archives. The GitHub Release job attaches these, source ZIP/TAR.GZ archives, and SHA-256 checksums. A separate GHCR job publishes the same seven SDK archives as versioned OCI packages and verifies immutable pull-backs. Docker Hub SDK image publication remains a separate optional channel.
