@@ -1,7 +1,7 @@
 # m-mdy-m/log.c — build, test, install and package the standalone logger.
 PROJECT := m-mdy-m/log.c
 PACKAGE := m-mdy-m-log
-VERSION := 0.1.0
+VERSION := 0.1.1
 LIBRARY := m-mdy-m-log
 CC ?= cc
 AR ?= ar
