@@ -4,8 +4,30 @@ All notable changes to `m-mdy-m/log.c` are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/) for release
 versions and [Keep a Changelog](https://keepachangelog.com/) for this file.
-The package version and the public C ABI version are separate: this release is
-package version `0.1.0`, while the current ABI reports major `1`, minor `0`.
+The package version and the public C ABI version are separate. Package releases
+do not change the public ABI unless the ABI contract itself changes; the current
+ABI reports major `1`, minor `0`.
+
+## [0.1.1] - 2026-11-09
+
+### Added
+
+- Publish all seven native SDK archives to GitHub Container Registry as
+  versioned OCI package artifacts, alongside the existing GitHub Release assets.
+- Per-target package metadata records component, package version, source
+  revision, target OS, architecture, ABI, archive media type, size, and SHA-256.
+- Immutable OCI digests, publication receipts, and pull-back verification
+  evidence are retained as GitHub Actions artifacts.
+- GHCR package publication reuses the exact SDK archives built for the GitHub
+  Release, so both distribution channels contain matching bytes.
+- Tests for the seven-target package inventory, archive naming, media types,
+  SemVer validation, and missing, empty, or symbolic-link package inputs.
+
+### Changed
+
+- Keep the package version at `0.1.1` while preserving public C ABI version
+  `1.0`; this is a package and distribution update, not an ABI change.
+- Keep Docker Hub SDK image publication as a separate optional channel.
 
 ## [0.1.0] - 2026-10-26
 
